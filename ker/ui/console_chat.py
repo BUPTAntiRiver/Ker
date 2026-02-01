@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 from ..agent import KerAgent
 
@@ -12,6 +13,7 @@ class ConsoleChatUI:
     """Minimal console-based chat interface."""
 
     prompt: str = "You> "
+    on_response: Callable[[str], None] | None = None
 
     def start(self, agent: KerAgent) -> None:
         """Start a simple REPL-style chat session."""
@@ -33,3 +35,5 @@ class ConsoleChatUI:
             response = agent.handle_user_message(user_input)
             if response:
                 print(f"Ker> {response}")
+                if self.on_response:
+                    self.on_response(response)

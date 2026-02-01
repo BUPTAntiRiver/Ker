@@ -30,8 +30,8 @@ class KerApp:
             llm_client = NullLLMClient()
 
         self.agent = KerAgent(llm_client=llm_client)
-        self.ui = ConsoleChatUI()
         self.voice = VoiceIO()
+        self.ui = ConsoleChatUI(on_response=self.voice.speak_streaming)
         self.screen = ScreenContextProvider()
 
     def run(self) -> None:

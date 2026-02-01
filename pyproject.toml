@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Ker is a non-autonomous AI learning companion"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+	"pyttsx3>=2.90",
+	"SpeechRecognition>=3.10.0",
+]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
