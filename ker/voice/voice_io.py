@@ -10,11 +10,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import importlib
 import logging
+import os
 import queue
 import re
 import threading
 import time
-from typing import Callable, Protocol
+from typing import Callable, Iterable, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,24 @@ class VoiceOutputConfig:
     rate: int | None = None
     volume: float | None = None
     voice_id: str | None = None
+    voice_name: str | None = None
+    voice_gender: str | None = "female"
+
+    @classmethod
+    def from_env(cls) -> "VoiceOutputConfig":
+        """Load voice output settings from environment variables."""
+
+        rate_value = os.getenv("KER_VOICE_RATE")
+        volume_value = os.getenv("KER_VOICE_VOLUME")
+        voice_gender = os.getenv("KER_VOICE_GENDER", "female")
+
+        return cls(
+            rate=int(rate_value) if rate_value else None,
+            volume=float(volume_value) if volume_value else None,
+            voice_id=os.getenv("KER_VOICE_ID"),
+            voice_name=os.getenv("KER_VOICE_NAME"),
+            voice_gender=voice_gender,
+        )
 
 
 class SpeechRecognitionBackend:
@@ -127,6 +146,14 @@ class Pyttsx3TTSBackend:
             self._engine.setProperty("volume", config.volume)
         if config.voice_id is not None:
             self._engine.setProperty("voice", config.voice_id)
+        else:
+            voice_id = _select_voice_id(
+                self._engine.getProperty("voices"),
+                preferred_name=config.voice_name,
+                preferred_gender=config.voice_gender,
+            )
+            if voice_id:
+                self._engine.setProperty("voice", voice_id)
 
         self._lock = threading.Lock()
 
@@ -317,6 +344,68 @@ def _split_into_chunks(text: str) -> list[str]:
     if buffer:
         chunks.append(buffer)
     return chunks
+
+
+def _select_voice_id(
+    voices: Iterable[object],
+    preferred_name: str | None,
+    preferred_gender: str | None,
+) -> str | None:
+    desired_gender = _normalize_gender(preferred_gender)
+    preferred_name_lower = preferred_name.lower() if preferred_name else None
+
+    best_score = 0
+    best_id: str | None = None
+
+    for voice in voices:
+        voice_id = getattr(voice, "id", None)
+        voice_name = getattr(voice, "name", "") or ""
+        voice_gender = _normalize_gender(getattr(voice, "gender", None))
+
+        score = 0
+        if preferred_name_lower and preferred_name_lower in voice_name.lower():
+            score += 3
+        if desired_gender and voice_gender == desired_gender:
+            score += 2
+        if desired_gender == "female" and _looks_female_voice(voice_name):
+            score += 1
+
+        if score > best_score and voice_id:
+            best_score = score
+            best_id = voice_id
+
+    return best_id
+
+
+def _normalize_gender(value: str | None) -> str | None:
+    if value is None:
+        return None
+    lowered = value.strip().lower()
+    if lowered in {"female", "f", "woman", "women", "girl"}:
+        return "female"
+    if lowered in {"male", "m", "man", "boy"}:
+        return "male"
+    if lowered in {"neutral", "none"}:
+        return "neutral"
+    return lowered or None
+
+
+def _looks_female_voice(name: str) -> bool:
+    lowered = name.lower()
+    return any(
+        token in lowered
+        for token in (
+            "female",
+            "zira",
+            "susan",
+            "samantha",
+            "victoria",
+            "karen",
+            "hazel",
+            "aria",
+            "jenny",
+        )
+    )
 
     def _report_error(self, message: str) -> None:
         logger.warning("Voice input unavailable: %s", message)

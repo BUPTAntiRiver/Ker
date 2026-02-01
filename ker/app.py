@@ -9,7 +9,7 @@ from .config import KerConfig
 from .llm import DeepSeekClient, NullLLMClient
 from .ui import ConsoleChatUI
 from .screen import ScreenContextProvider
-from .voice import VoiceIO
+from .voice import VoiceIO, VoiceOutputConfig
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class KerApp:
             llm_client = NullLLMClient()
 
         self.agent = KerAgent(llm_client=llm_client)
-        self.voice = VoiceIO()
+        self.voice = VoiceIO(output_config=VoiceOutputConfig.from_env())
         self.ui = ConsoleChatUI(on_response=self.voice.speak_streaming)
         self.screen = ScreenContextProvider()
 
