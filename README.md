@@ -38,6 +38,19 @@ Console mode provides a simple REPL for early development.
 
 If no API key is configured, Ker will return a configuration hint message instead of calling the LLM.
 
+## Tests (uv)
+
+Use uv to manage the environment and run tests:
+
+1) Create the environment and install test dependencies:
+
+   uv venv
+   uv pip install -e ".[test]"
+
+2) Run tests:
+
+   uv run pytest
+
 ## Privacy & Safety
 
 - Screen context is only used when explicitly provided by the user.
