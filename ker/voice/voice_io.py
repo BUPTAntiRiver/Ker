@@ -16,6 +16,7 @@ import re
 import threading
 import time
 from typing import Callable, Iterable, Protocol
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,20 @@ class VoiceIOConfig:
     energy_threshold: int | None = None
     pause_threshold: float = 0.8
     device_index: int | None = None
+    suppress_audio_logs: bool = True
+
+    @classmethod
+    def from_env(cls) -> "VoiceIOConfig":
+        """Load voice input settings from environment variables."""
+
+        return cls(
+            listen_timeout=float(os.getenv("KER_VOICE_LISTEN_TIMEOUT", "1.0")),
+            phrase_time_limit=float(os.getenv("KER_VOICE_PHRASE_LIMIT", "8.0")),
+            energy_threshold=_optional_int(os.getenv("KER_VOICE_ENERGY_THRESHOLD")),
+            pause_threshold=float(os.getenv("KER_VOICE_PAUSE_THRESHOLD", "0.8")),
+            device_index=_optional_int(os.getenv("KER_VOICE_DEVICE_INDEX")),
+            suppress_audio_logs=_truthy(os.getenv("KER_SUPPRESS_AUDIO_LOGS", "true")),
+        )
 
 
 @dataclass(frozen=True)
@@ -58,6 +73,7 @@ class VoiceOutputConfig:
     voice_id: str | None = None
     voice_name: str | None = None
     voice_gender: str | None = "female"
+    prefer_language: str | None = "en"
 
     @classmethod
     def from_env(cls) -> "VoiceOutputConfig":
@@ -66,6 +82,7 @@ class VoiceOutputConfig:
         rate_value = os.getenv("KER_VOICE_RATE")
         volume_value = os.getenv("KER_VOICE_VOLUME")
         voice_gender = os.getenv("KER_VOICE_GENDER", "female")
+        prefer_language = os.getenv("KER_VOICE_LANGUAGE", "en")
 
         return cls(
             rate=int(rate_value) if rate_value else None,
@@ -73,6 +90,7 @@ class VoiceOutputConfig:
             voice_id=os.getenv("KER_VOICE_ID"),
             voice_name=os.getenv("KER_VOICE_NAME"),
             voice_gender=voice_gender,
+            prefer_language=prefer_language,
         )
 
 
@@ -84,6 +102,10 @@ class SpeechRecognitionBackend:
             raise RuntimeError(
                 "speech_recognition is not installed. "
                 "Install it to enable voice input."
+            )
+        if importlib.util.find_spec("pyaudio") is None:
+            raise RuntimeError(
+                "PyAudio is not installed. Install it to enable microphone input."
             )
 
         import speech_recognition as sr  # type: ignore
@@ -101,19 +123,21 @@ class SpeechRecognitionBackend:
             recognizer.energy_threshold = self._config.energy_threshold
         recognizer.pause_threshold = self._config.pause_threshold
 
-        microphone = self._sr.Microphone(device_index=self._config.device_index)
-        with microphone as source:
-            recognizer.adjust_for_ambient_noise(source, duration=0.8)
-            logger.info("Voice input: microphone initialized.")
+        with _maybe_suppress_stderr(self._config.suppress_audio_logs):
+            microphone = self._sr.Microphone(device_index=self._config.device_index)
+            with microphone as source:
+                recognizer.adjust_for_ambient_noise(source, duration=0.8)
+                logger.info("Voice input: microphone initialized.")
 
         while not stop_event.is_set():
             try:
-                with microphone as source:
-                    audio = recognizer.listen(
-                        source,
-                        timeout=self._config.listen_timeout,
-                        phrase_time_limit=self._config.phrase_time_limit,
-                    )
+                with _maybe_suppress_stderr(self._config.suppress_audio_logs):
+                    with microphone as source:
+                        audio = recognizer.listen(
+                            source,
+                            timeout=self._config.listen_timeout,
+                            phrase_time_limit=self._config.phrase_time_limit,
+                        )
                 transcript = recognizer.recognize_google(audio)
                 cleaned = transcript.strip()
                 if cleaned:
@@ -151,6 +175,7 @@ class Pyttsx3TTSBackend:
                 self._engine.getProperty("voices"),
                 preferred_name=config.voice_name,
                 preferred_gender=config.voice_gender,
+                preferred_language=config.prefer_language,
             )
             if voice_id:
                 self._engine.setProperty("voice", voice_id)
@@ -325,6 +350,11 @@ class VoiceIO:
         except Exception as exc:  # noqa: BLE001
             self._report_error(f"TTS backend failed: {exc}")
 
+    def _report_error(self, message: str) -> None:
+        logger.warning("Voice input unavailable: %s", message)
+        if self.on_error:
+            self.on_error(message)
+
 
 def _split_into_chunks(text: str) -> list[str]:
     sentences = re.split(r"(?<=[.!?])\s+", text)
@@ -346,13 +376,45 @@ def _split_into_chunks(text: str) -> list[str]:
     return chunks
 
 
+def _optional_int(value: str | None) -> int | None:
+    if value is None or not value.strip():
+        return None
+    return int(value)
+
+
+def _truthy(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "y"}
+
+
+@contextmanager
+def _maybe_suppress_stderr(enabled: bool):
+    if not enabled:
+        yield
+        return
+    try:
+        with open(os.devnull, "w", encoding="utf-8") as devnull:
+            original_stderr = os.dup(2)
+            os.dup2(devnull.fileno(), 2)
+            try:
+                yield
+            finally:
+                os.dup2(original_stderr, 2)
+                os.close(original_stderr)
+    except OSError:
+        yield
+
+
 def _select_voice_id(
     voices: Iterable[object],
     preferred_name: str | None,
     preferred_gender: str | None,
+    preferred_language: str | None,
 ) -> str | None:
     desired_gender = _normalize_gender(preferred_gender)
     preferred_name_lower = preferred_name.lower() if preferred_name else None
+    preferred_language_lower = preferred_language.lower() if preferred_language else None
 
     best_score = 0
     best_id: str | None = None
@@ -361,13 +423,16 @@ def _select_voice_id(
         voice_id = getattr(voice, "id", None)
         voice_name = getattr(voice, "name", "") or ""
         voice_gender = _normalize_gender(getattr(voice, "gender", None))
+        voice_languages = _extract_languages(getattr(voice, "languages", None))
 
         score = 0
         if preferred_name_lower and preferred_name_lower in voice_name.lower():
             score += 3
         if desired_gender and voice_gender == desired_gender:
             score += 2
-        if desired_gender == "female" and _looks_female_voice(voice_name):
+        if desired_gender == "female" and _looks_female_voice(voice_name, voice_id):
+            score += 1
+        if preferred_language_lower and preferred_language_lower in voice_languages:
             score += 1
 
         if score > best_score and voice_id:
@@ -390,10 +455,11 @@ def _normalize_gender(value: str | None) -> str | None:
     return lowered or None
 
 
-def _looks_female_voice(name: str) -> bool:
+def _looks_female_voice(name: str, voice_id: str | None) -> bool:
     lowered = name.lower()
+    id_lower = voice_id.lower() if voice_id else ""
     return any(
-        token in lowered
+        token in lowered or token in id_lower
         for token in (
             "female",
             "zira",
@@ -404,10 +470,35 @@ def _looks_female_voice(name: str) -> bool:
             "hazel",
             "aria",
             "jenny",
+            "f1",
+            "f2",
+            "f3",
+            "f4",
+            "f5",
+            "en+f",
+            "en-us+f",
         )
     )
 
-    def _report_error(self, message: str) -> None:
-        logger.warning("Voice input unavailable: %s", message)
-        if self.on_error:
-            self.on_error(message)
+
+def _extract_languages(raw_languages: object) -> set[str]:
+    languages: set[str] = set()
+    if raw_languages is None:
+        return languages
+    if isinstance(raw_languages, (list, tuple)):
+        candidates = raw_languages
+    else:
+        candidates = [raw_languages]
+    for value in candidates:
+        if isinstance(value, bytes):
+            text = value.decode("utf-8", errors="ignore")
+        else:
+            text = str(value)
+        text = text.replace("\x05", "")
+        lowered = text.lower()
+        if lowered:
+            languages.add(lowered)
+            languages.add(lowered.replace("_", "-"))
+    return languages
+
+

@@ -31,7 +31,7 @@ Ker is split into clear modules:
 
 ## Running (Console Mode)
 
-Console mode provides a simple REPL for early development.
+Console mode provides a simple REPL for early development, and voice listening starts by default.
 
 1) Set environment variables (optional but recommended):
    - DEEPSEEK_API_KEY
@@ -43,6 +43,17 @@ Console mode provides a simple REPL for early development.
    - KER_VOICE_ID (optional, explicit engine voice id)
    - KER_VOICE_RATE (optional, integer)
    - KER_VOICE_VOLUME (optional, 0.0-1.0)
+   - KER_VOICE_LANGUAGE (default: en)
+   - KER_VOICE_TEXT_OUTPUT (default: true)
+   - KER_VOICE_TEXT_INPUT (default: true)
+   - KER_CONSOLE_ENABLED (default: false)
+   - KER_TRANSCRIPT_LOG (optional file path to append transcripts)
+   - KER_LOG_LEVEL (default: WARNING)
+   - KER_SUPPRESS_AUDIO_LOGS (default: true)
+
+Voice input on Linux requires PyAudio and the PortAudio system library. Install the extra:
+
+   uv pip install -e ".[voice]"
 
 2) Run:
 

@@ -29,7 +29,15 @@ def test_select_voice_prefers_named_voice() -> None:
         DummyVoice(id="1", name="Generic Male", gender="male"),
         DummyVoice(id="2", name="Aria Pleasant", gender="female"),
     ]
-    assert _select_voice_id(voices, preferred_name="Aria", preferred_gender=None) == "2"
+    assert (
+        _select_voice_id(
+            voices,
+            preferred_name="Aria",
+            preferred_gender=None,
+            preferred_language=None,
+        )
+        == "2"
+    )
 
 
 def test_select_voice_prefers_female_when_requested() -> None:
@@ -37,4 +45,12 @@ def test_select_voice_prefers_female_when_requested() -> None:
         DummyVoice(id="1", name="Generic Male", gender="male"),
         DummyVoice(id="2", name="Kind Voice", gender="female"),
     ]
-    assert _select_voice_id(voices, preferred_name=None, preferred_gender="female") == "2"
+    assert (
+        _select_voice_id(
+            voices,
+            preferred_name=None,
+            preferred_gender="female",
+            preferred_language=None,
+        )
+        == "2"
+    )
