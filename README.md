@@ -33,25 +33,7 @@ Ker is split into clear modules:
 
 Console mode provides a simple REPL for early development, and voice listening starts by default.
 
-1) Set environment variables (optional but recommended):
-   - DEEPSEEK_API_KEY
-   - DEEPSEEK_BASE_URL (default: <https://api.deepseek.com>)
-   - KER_MODEL (default: deepseek-chat)
-   - KER_TEMPERATURE (default: 0.4)
-   - KER_VOICE_GENDER (default: female)
-   - KER_VOICE_NAME (optional, substring match)
-   - KER_VOICE_ID (optional, explicit engine voice id)
-   - KER_VOICE_RATE (optional, integer)
-   - KER_VOICE_VOLUME (optional, 0.0-1.0)
-   - KER_VOICE_LANGUAGE (default: en)
-   - KER_VOICE_TEXT_OUTPUT (default: true)
-   - KER_VOICE_TEXT_INPUT (default: true)
-   - KER_CONSOLE_ENABLED (default: false)
-   - KER_TRANSCRIPT_LOG (optional file path to append transcripts)
-   - KER_LOG_LEVEL (default: WARNING)
-   - KER_SUPPRESS_AUDIO_LOGS (default: true)
-
-Voice input on Linux requires PyAudio and the PortAudio system library. Install the extra:
+1) Install voice dependencies (Linux):
 
    uv pip install -e ".[voice]"
 
@@ -60,6 +42,46 @@ Voice input on Linux requires PyAudio and the PortAudio system library. Install 
    uv run main.py
 
 If no API key is configured, Ker will return a configuration hint message instead of calling the LLM.
+
+## Configuration
+
+Set environment variables to configure Ker:
+
+LLM:
+
+- DEEPSEEK_API_KEY
+- DEEPSEEK_BASE_URL (default: <https://api.deepseek.com>)
+- KER_MODEL (default: deepseek-chat)
+- KER_TEMPERATURE (default: 0.4)
+
+Voice output:
+
+- KER_VOICE_GENDER (default: female)
+- KER_VOICE_NAME (optional, substring match)
+- KER_VOICE_ID (optional, explicit engine voice id)
+- KER_VOICE_RATE (optional, integer)
+- KER_VOICE_VOLUME (optional, 0.0-1.0)
+- KER_VOICE_LANGUAGE (default: en)
+
+Console/visibility:
+
+- KER_VOICE_TEXT_INPUT (default: true)
+- KER_VOICE_TEXT_OUTPUT (default: true)
+- KER_CONSOLE_ENABLED (default: false)
+- KER_TRANSCRIPT_LOG (optional file path to append transcripts)
+- KER_LOG_LEVEL (default: WARNING)
+- KER_SUPPRESS_AUDIO_LOGS (default: true)
+
+Examples:
+
+- Prefer a named female voice:
+  KER_VOICE_GENDER=female KER_VOICE_NAME=Aria uv run main.py
+
+- Enable the text prompt alongside voice:
+  KER_CONSOLE_ENABLED=true uv run main.py
+
+- Save transcripts to a file:
+  KER_TRANSCRIPT_LOG=ker_transcript.log uv run main.py
 
 ## Tests (uv)
 
