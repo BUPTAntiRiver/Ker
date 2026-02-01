@@ -1,7 +1,14 @@
 [project]
 name = "ker"
 version = "0.1.0"
-description = "Add your description here"
+description = "Ker is a non-autonomous AI learning companion"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["ker"]

@@ -2,20 +2,43 @@
 
 ## What is Ker?
 
-Ker is a AI agent that accompany user throughout their journey of learning, it behaves like a tutor, a mentor, a friend. It does not set goals, make plans, or take actions on behalf of the user. Instead, it focuses on providing support, encouragement, and guidance to help the user achieve their own goals.
+Ker is a non-autonomous AI learning companion. It supports users as a tutor, mentor, and friend while staying strictly user-driven. Ker never sets goals, plans tasks, or takes actions on a user's behalf. It only responds to explicit input and can offer explanations, hints, or optional suggestions.
 
-## Features
+## Features (Planned)
 
-Uses DeepSeek API as its core engine. After launching, Ker will appear as a floating icon on your screen, ready to assist you whenever you need help.
+- DeepSeek API backend
+- Desktop application with floating icon
+- Voice input (always listening, user-driven)
+- Text chat interface
+- Screen context awareness (explicit, opt-in)
 
-You can chat or discuss with Ker by clicking on the icon. It will respond to your queries, provide explanations, and offer suggestions based on your learning needs.
+## Architecture
 
-Ker will also track you screen content and provide relevant information or resources when it detects that you might need assistance.
+Ker is split into clear modules:
 
-## Installation
+- UI: chat UI and floating icon
+- Agent logic: user-driven reasoning and response handling
+- LLM client: DeepSeek API wrapper
+- Voice I/O: audio capture and playback
+- Screen context: explicit capture when requested
 
-TODO
+## Running (Console Mode)
 
-## Usage
+Console mode provides a simple REPL for early development.
 
-TODO
+1) Set environment variables (optional but recommended):
+   - DEEPSEEK_API_KEY
+   - DEEPSEEK_BASE_URL (default: <https://api.deepseek.com>)
+   - KER_MODEL (default: deepseek-chat)
+   - KER_TEMPERATURE (default: 0.4)
+
+2) Run:
+
+   python main.py
+
+If no API key is configured, Ker will return a configuration hint message instead of calling the LLM.
+
+## Privacy & Safety
+
+- Screen context is only used when explicitly provided by the user.
+- Voice and screen subsystems are placeholders and do not capture data yet.
